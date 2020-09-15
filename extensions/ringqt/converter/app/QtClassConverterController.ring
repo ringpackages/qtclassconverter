@@ -1,5 +1,6 @@
 # Application  : Qt Class Converter
 # Author       : Majdi Sobain <MajdiSobain@gmail.com>
+#	       : Mahmoud Fayed <msfclipper@yahoo.com>
 
 # Form/Window Controller - Source Code File
 
@@ -26,8 +27,12 @@ func PrepareMainWindow
 		RBNormal.setChecked(True)
 		ClassCodeNameLE.setEnabled(False)
 		QtEventsOutputTE.SetEnabled(False)
+		QtcfHeaderOutputTE.SetEnabled(False)
+		QtcfEnumOutputTE.SetEnabled(False)
 		QtcfOutputTE.SetEnabled(False)
 		QtEventsOutputTE.setAcceptRichText(False)
+		QtcfHeaderOutputTE.setAcceptRichText(False)
+		QtcfEnumOutputTE.setAcceptRichText(False)
 		QtcfOutputTE.setAcceptRichText(False)
 		SignalsTE.setAcceptRichText(False)
 		EnumsFlagsTE.setAcceptRichText(False)
@@ -62,11 +67,15 @@ func SignalsTEChangedAction
 			PassVMPointerCB.SetEnabled(False)
 			PassVMPointerCB.SetChecked(False)
 			if this.TrimAll(EnumsFlagsTE.toPlaintext()) = NULL and this.TrimAll(FunctionsTE.toPlaintext()) = NULL
+				QtcfHeaderOutputTE.SetEnabled(False)
+				QtcfEnumOutputTE.SetEnabled(False)
 				QtcfOutputTE.SetEnabled(False)
 			ok
 		else
 			ClassCodeNameLE.SetEnabled(True)
 			QtEventsOutputTE.SetEnabled(True)
+			QtcfHeaderOutputTE.SetEnabled(True)
+			QtcfEnumOutputTE.SetEnabled(True)
 			QtcfOutputTE.SetEnabled(True)
 			PassVMPointerCB.SetEnabled(True)
 			PassVMPointerCB.SetChecked(True)
@@ -76,10 +85,8 @@ func SignalsTEChangedAction
 func ClassNameLEChangedAction
 	oView{
 		if this.TrimAll(ClassNameLE.text()) = NULL
-			ClassParaL.setText("")
 			ClassCodeNameLE.setText("")
 		else
-			ClassParaL.setText("Parameters of first :  " + ClassNameLE.text() + "() Function")
 			if len(ClassNameLE.text()) > 2
 				ClassCodeNameLE.setText("G" + right(ClassNameLE.text(), len(ClassNameLE.text())-1) )
 			else
@@ -91,14 +98,24 @@ func ClassNameLEChangedAction
 func FunctionsTEChangedAction
 	oView {
 		if this.TrimAll(FunctionsTE.toPlaintext()) = NULL And this.TrimAll(EnumsFlagsTE.toPlaintext()) = NULL 
+			QtcfHeaderOutputTE.SetEnabled(False)
+			QtcfEnumOutputTE.SetEnabled(False)
 			QtcfOutputTE.SetEnabled(False)
 		else
+			QtcfHeaderOutputTE.SetEnabled(True)
+			QtcfEnumOutputTE.SetEnabled(True)
 			QtcfOutputTE.SetEnabled(True)
 		ok
 	}
 
 func ConvertBtnAction
 	oView{
+		# Prepare parameters 
+			classNameLE.setText(Trim(classNameLE.text()))
+			classParentLE.setText(Trim(classParentLE.text()))
+			classParaLE.setText(Trim(classParaLE.text()))
+		QtcfHeaderOutputTE.setText("")
+		QtcfEnumOutputTE.setText("")
 		QtcfOutputTE.setText("")
 		QtEventsOutputTE.setText("")
 		cStr1 = ""
@@ -113,6 +130,21 @@ func ConvertBtnAction
 		cStr2 = SignalsTE.toPlainText()
 		aList2 = str2List(cStr2)
 		this.pSignalsProcess(aList2)
+	}
+
+func ClearBtnAction
+	oView {
+		classNameLE.setText("")
+		classParentLE.setText("")
+		classParaLE.setText("")
+		classCodeNameLE.setText("")
+		enumsFlagsTE.setText("")
+		functionsTE.setText("")
+		signalsTE.setText("")
+		qtcfHeaderOutputTE.setText("")
+		qtcfEnumOutputTE.setText("")
+		qtcfOutputTE.setText("")
+		qteventsOutputTE.settext("")
 	}
 
 func TrimAll str 
@@ -134,14 +166,21 @@ func pFunctionsProcess aList
 		ok
 	next
 
-	cOutput = "#include <" + cClassName + ">" 
+	# Support using the Module name 
+		cModuleName = TrimAll(oView.ModuleNameLE.text())
+		if cModuleName != NULL
+			cOutput = "#include <" + cModuleName + ">" 
+		else 
+			cOutput = "#include <" + cClassName + ">" 
+		ok
+
 	if oView.ClassCodeNameLE.IsEnabled()
 		cOutput = cOutput + nl + '#include "' + lower(oView.ClassCodeNameLE.text()) + '.h"'
 	ok
-	cOutput = cOutput + nl + nl + copy("-", 35) + nl
+	
+	oView.QtcfHeaderOutputTE.setText(cOutput)
 
-	cOutput = cOutput + nl + "<class>"
-	cOutput = cOutput + nl + "name: " + cClassName
+	cOutput = "<class>" + nl + "name: " + cClassName
 
 	if (oView.RBNormal.ischecked() Or oView.RBAbstract.ischecked()) and TrimAll(oView.ClassParaLE.text()) != NULL
 		cClassPara = oView.ClassParaLE.text()
@@ -187,7 +226,7 @@ func pFunctionsProcess aList
 		cOutput = cOutput + nl + "passvmpointer"
 	ok
 
-	cOutput = cOutput + nl + "</class>" + nl + nl
+	cOutput = cOutput + nl + "</class>" 
 
 	for cLine in aList
 		cLine = trim(cLine)
@@ -236,11 +275,11 @@ func pFunctionsProcess aList
 	next
 
 	if len(aEnum)
-		cOutput = cOutput + nl + "<runcode>"
+		cEnumOutput = ""
 		for cEnum in aEnum
-			cOutput = cOutput + nl + ' aEnumTypes + "' + cEnum + '"' 
+			cEnumOutput += ' aEnumTypes + "' + cEnum + '"' + nl
 		next
-		cOutput = cOutput + nl + "</runcode>"
+		oView.QtcfEnumOutputTE.setText(cEnumOutput)
 	ok
 
 	for i = 1 to Len(aFunctions)
@@ -329,6 +368,13 @@ Func pSignalsProcess aList
 	cClassName = TrimAll(oView.ClassCodeNameLE.text())
 	cClassRealName = TrimAll(oView.ClassNameLE.text())
 
+	# Support using the Module name 
+		cModuleName = TrimAll(oView.ModuleNameLE.text())
+		if cModuleName != NULL
+			cClassRealName = cModuleName + "::" + cClassRealName
+		ok
+
+
 	for itr = len(aList) to 1 step -1
 		if TrimAll(left(aList[itr], substr(aList[itr], "(")-1)) = NULL
 			del(aList, itr)
@@ -362,7 +408,32 @@ Func pSignalsProcess aList
 			next
 			cClassPara = substr(list2str(cClassPara), NL, ",")
 		ok
-		cOutput = substr(cOutput, "<classparas>", NL + char(9) + char(9) + char(9) + ':initpara = "' + cClassPara + '",')
+
+		# Process class parameters for events 
+			cInitParaParent = ""
+			cNewClassPara = ""
+			nCount = 0
+			for cLetter in cClassPara 
+				if cLetter = ","
+					nCount++
+					if nCount = 1
+						cNewExpr = "x,"
+					else 
+						cNewExpr = "x" + nCount + ","
+					ok
+					cNewClassPara   += cNewExpr
+					cInitParaParent += cNewExpr
+				else 
+					cNewClassPara += cLetter
+				ok
+			next 
+			cClassPara = cNewClassPara
+
+		cOutput = substr(cOutput, "<classparas>", NL + char(9) + char(9)  +
+				 ':headerfile = "' + cModuleName + '",' + NL + char(9) + char(9)  +
+				 ':initpara = "' + cClassPara + ' ",' + NL + char(9) + char(9) +
+				 ':initparaparent = "'+ cInitParaParent  +'",' 
+			  )
 	else
 		cOutput = substr(cOutput, "<classparas>", "")
 	ok
@@ -415,5 +486,178 @@ Func pSignalsProcess aList
 		QtcfOutputTE.setText(QtcfOutputTE.toPlainText() + nl + nl + cSetEvents + nl + cGetEvents)
 	}
 
+func LoadTestDataBtnAction
+	oView {
+		moduleNameLE.setText("QtCharts")
+		folderNameLE.setText("charts")
+		classNameLE.setText("QChart")
+		classParentLE.setText("QGraphicsWidget")
+		classParaLE.setText("QGraphicsItem *parent = nullptr, Qt::WindowFlags wFlags = Qt::WindowFlags()")
+		classCodeNameLE.setText("GChart")
+		enumsFlagsTE.setText(SubStr("
+			enum 	AnimationOption { NoAnimation, GridAxisAnimations, SeriesAnimations, AllAnimations }
+			flags 	AnimationOptions
+			enum 	ChartTheme { ChartThemeLight, ChartThemeBlueCerulean, ChartThemeDark, ChartThemeBrownSand, ..., ChartThemeQt }
+			enum 	ChartType { ChartTypeUndefined, ChartTypeCartesian, ChartTypePolar }
+		",Tab,NULL))
+		functionsTE.setText(SubStr("
+			void 	addAxis(QAbstractAxis *axis, Qt::Alignment alignment)
+			void 	addSeries(QAbstractSeries *series)
+			int 	animationDuration() const
+			QEasingCurve 	animationEasingCurve() const
+			QChart::AnimationOptions 	animationOptions() const
+			QList<QAbstractAxis *> 	axes(Qt::Orientations orientation = Qt::Horizontal|Qt::Vertical, QAbstractSeries *series = nullptr) const
+			QBrush 	backgroundBrush() const
+			QPen 	backgroundPen() const
+			qreal 	backgroundRoundness() const
+			QChart::ChartType 	chartType() const
+			void 	createDefaultAxes()
+			bool 	isBackgroundVisible() const
+			bool 	isDropShadowEnabled() const
+			bool 	isPlotAreaBackgroundVisible() const
+			bool 	isZoomed()
+			QLegend *	legend() const
+			QLocale 	locale() const
+			bool 	localizeNumbers() const
+			QPointF 	mapToPosition(const QPointF &value, QAbstractSeries *series = nullptr)
+			QPointF 	mapToValue(const QPointF &position, QAbstractSeries *series = nullptr)
+			QMargins 	margins() const
+			QRectF 	plotArea() const
+			QBrush 	plotAreaBackgroundBrush() const
+			QPen 	plotAreaBackgroundPen() const
+			void 	removeAllSeries()
+			void 	removeAxis(QAbstractAxis *axis)
+			void 	removeSeries(QAbstractSeries *series)
+			void 	scroll(qreal dx, qreal dy)
+			QList<QAbstractSeries *> 	series() const
+			void 	setAnimationDuration(int msecs)
+			void 	setAnimationEasingCurve(const QEasingCurve &curve)
+			void 	setAnimationOptions(QChart::AnimationOptions options)
+			void 	setBackgroundBrush(const QBrush &brush)
+			void 	setBackgroundPen(const QPen &pen)
+			void 	setBackgroundRoundness(qreal diameter)
+			void 	setBackgroundVisible(bool visible = true)
+			void 	setDropShadowEnabled(bool enabled = true)
+			void 	setLocale(const QLocale &locale)
+			void 	setLocalizeNumbers(bool localize)
+			void 	setMargins(const QMargins &margins)
+			void 	setPlotArea(const QRectF &rect)
+			void 	setPlotAreaBackgroundBrush(const QBrush &brush)
+			void 	setPlotAreaBackgroundPen(const QPen &pen)
+			void 	setPlotAreaBackgroundVisible(bool visible = true)
+			void 	setTheme(QChart::ChartTheme theme)
+			void 	setTitle(const QString &title)
+			void 	setTitleBrush(const QBrush &brush)
+			void 	setTitleFont(const QFont &font)
+			QChart::ChartTheme 	theme() const
+			QString 	title() const
+			QBrush 	titleBrush() const
+			QFont 	titleFont() const
+			void 	zoom(qreal factor)
+			void 	zoomIn()
+			void 	zoomIn(const QRectF &rect)
+			void 	zoomOut()
+			void 	zoomReset()
+		",Tab,NULL))
+		signalsTE.setText(SubStr("
+			void 	plotAreaChanged(const QRectF &plotArea)
+		",Tab,NULL))
+		qtcfHeaderOutputTE.setText("")
+		qtcfEnumOutputTE.setText("")
+		qtcfOutputTE.setText("")
+		qteventsOutputTE.settext("")
+	}
 
+func WriteClassFiles
+
+	cFolder = TrimAll(oView.folderNameLE.text())
+	if cFolder = NULL 
+		msginfo("Sorry","Write the folder name after the module name")
+		return 
+	ok
+
+	cClassName = TrimAll(oView.classNameLE.text())
+	if cClassName = NULL 
+		msginfo("Sorry","Write the class name")
+		return 
+	ok
+
+	cClassFile = exefolder()+
+		   "../extensions/ringqt/classes/" + cFolder + "/" + 
+		   lower(cClassName) + ".cf"
+
+	cEventsFile = exefolder()+
+		   "../extensions/ringqt/events/" + cFolder + "/" + 
+		   lower(cClassName) + ".ring"
+
+	write(cClassFile,oView.QtcfOutputTE.toplaintext())
+
+	cEventsFileContent = oView.QteventsOutputTE.toplaintext()
+	if trim(cEventsFileContent) != NULL
+		write(cEventsFile,oView.QteventsOutputTE.toplaintext())
+	ok
+
+	msginfo("Writing Files","Opeartion done!")
+
+
+func openEnumFile
+
+	oView.qtcfEnumOutputTE { selectall() copy() }
+	RunProcess("notepad.exe",exefolder()+
+		   "../extensions/ringqt/classes/qt_enumtypes.cf")
+
+
+func openHeaderFile
+
+	oView.qtcfHeaderOutputTE { selectall() copy() }
+	RunProcess("notepad.exe",exefolder()+
+		   "../extensions/ringqt/classes/qt_headerfiles.cf")
+
+func openModuleFile
+
+	cFile = exefolder()+"../extensions/ringqt/classes/qt_module_"+
+		oView.folderNameLE.text()+".cf"
+	if fexists(cFile)
+		RunProcess("notepad.exe",cFile)
+	else
+		msginfo("Sorry","Can't open the module file : " + cFile + nl +
+			"Write the folder name after the module name")
+	ok
+
+func openEventsFile
+
+	RunProcess("notepad.exe",exefolder()+
+		   "../extensions/ringqt/events/qtevents_files.ring")
+
+func openProFiles
+
+	RunProcess("notepad.exe",exefolder()+
+		   "../extensions/webassembly/ringqt/project/project.pro")
+
+	RunProcess("notepad.exe",exefolder()+
+		   "../extensions/android/ringqt/project/project.pro")
+
+	RunProcess("notepad.exe",exefolder()+
+		   "../extensions/ringqt/ring_qt512.pro")
+
+	RunProcess("notepad.exe",exefolder()+
+		   "../extensions/ringqt/ring_qt512_nobluetooth.pro")
+
+
+func RunProcess cProgram,cArg
+	aPara = split(cArg,",")
+	oStringList = new qStringlist() {
+		for cPara in aPara 
+			append(cPara)
+		next
+	}
+	oProcess = new qprocess(NULL) {
+		setprogram( cProgram)
+		setarguments(ostringlist)
+		start_3(  QIODevice_ReadWrite )
+	}
+	return oProcess
+
+func closeApplication
+	oView.win.close() 
 
